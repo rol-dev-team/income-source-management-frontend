@@ -1,0 +1,75 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PencilSquareIcon } from "@heroicons/react/24/outline";
+import DataTable from "../../components/common/DataTable.component";
+import { fetchAccountNumber } from "../../service/accountNumberApi";
+
+const AccountNumberPage = () => {
+  const [data, setData] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [editedCurrency, setEditedCurrency] = useState(null);
+  const [reloadDataTrigger, setReloadDataTrigger] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const pageSize = 10;
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const res = await fetchAccountNumber(currentPage, pageSize);
+        setData(res.data);
+        setTotalPages(Math.ceil(res.total / pageSize));
+      } catch (err) {
+        showToast.error(err.message || "Failed to fetch users");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [currentPage, pageSize, reloadDataTrigger]);
+
+  const columns = [
+    { header: "Payment Mode", accessor: "channel_name", sortable: true },
+    { header: "Payment Channel", accessor: "method_name", sortable: true },
+    { header: "Account No.", accessor: "ac_no", sortable: true },
+    { header: "Account Name.", accessor: "ac_name", sortable: true },
+    { header: "Account Details.", accessor: "ac_details", sortable: true },
+    {
+      header: "Actions",
+      accessor: (row) => (
+        <button
+          onClick={() => handleEdit(row)}
+          className='text-blue-600 hover:underline'>
+          <PencilSquareIcon className='w-5 h-5 text-gray-600' />
+        </button>
+      ),
+    },
+  ];
+
+  const handleEdit = (currency) => {
+    navigate(`/settings/create-account-number`, { state: { currency } });
+  };
+
+  return (
+    <div>
+      <DataTable
+        columns={columns}
+        data={data}
+        pageSize={pageSize}
+        loading={loading}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={(page) => {
+          setCurrentPage(page);
+        }}
+        title='Account Numbers'
+        link='/settings/create-account-number'
+      />
+    </div>
+  );
+};
+
+export default AccountNumberPage;
