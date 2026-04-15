@@ -449,6 +449,23 @@ useEffect(() => {
     return lookup;
   }, [currencyMatrix]);
 
+  const totalCurrencyBalances = useMemo(() => {
+    return accountBalance
+      .filter((account) => account.method_name !== "TOTAL")
+      .reduce((totals, account) => {
+        const balances =
+          currencyMatrixLookup[account.method_name] ||
+          currencyMatrixLookup[String(account.method_name).toLowerCase()] ||
+          {};
+
+        currencyCodes.forEach((code) => {
+          totals[code] = (Number(totals[code]) || 0) + (Number(balances[code]) || 0);
+        });
+
+        return totals;
+      }, {});
+  }, [accountBalance, currencyCodes, currencyMatrixLookup]);
+
   // --- CHART TOOLTIP COMPONENT PROPS ---
   const memoizedIncomeExpenseTooltip = useMemo(
     () => <CustomTooltip formatCurrency={formatCurrencyLarge} />,
@@ -705,28 +722,21 @@ useEffect(() => {
                 })}
                 {accountBalance
                   .filter(acc => acc.method_name === "TOTAL")
-                  .map((totalRow, index) => {
-                    const totalCurrencyBalances =
-                      currencyMatrixLookup[totalRow.method_name] ||
-                      currencyMatrixLookup[String(totalRow.method_name).toLowerCase()] ||
-                      {};
-
-                    return (
-                      <tr key={index} className='bg-gradient-to-r from-blue-50 to-indigo-50'>
-                        <td colSpan='2' className='py-5 px-6 font-bold text-gray-900 text-base'>
-                          TOTAL BALANCE
+                  .map((totalRow, index) => (
+                    <tr key={index} className='bg-gradient-to-r from-blue-50 to-indigo-50'>
+                      <td colSpan='2' className='py-5 px-6 font-bold text-gray-900 text-base'>
+                        TOTAL BALANCE
+                      </td>
+                      <td className='py-5 px-6 text-right font-bold text-2xl text-blue-600'>
+                        {formatCurrencyLarge(Number(totalRow.balance || 0))}
+                      </td>
+                      {currencyCodes.map((code) => (
+                        <td key={code} className='py-5 px-6 text-right font-bold text-base text-blue-600'>
+                          {formatNumber(totalCurrencyBalances[code] ?? 0)}
                         </td>
-                        <td className='py-5 px-6 text-right font-bold text-2xl text-blue-600'>
-                          {formatCurrencyLarge(Number(totalRow.balance || 0))}
-                        </td>
-                        {currencyCodes.map((code) => (
-                          <td key={code} className='py-5 px-6 text-right font-bold text-base text-blue-600'>
-                            {formatNumber(totalCurrencyBalances[code] ?? 0)}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
+                      ))}
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
