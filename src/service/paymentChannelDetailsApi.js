@@ -16,3 +16,7 @@ export const updatePaymentChannelDetails = (id, data) =>
   apiClient.put(`/payment-channels-details/${id}`, data);
 export const deletePaymentChannelDetails = (id) =>
   apiClient.delete(`/payment-channels-details/${id}`);
+export const fetchAllPaymentChannelsByCurrency = (config) =>
+  apiClient.get(`/payment-channel-summary`, config);
+export const fetchForignCurrencyByPaymentChannel = (config) =>
+  apiClient.get(`/channel-currency-matrix`, config);

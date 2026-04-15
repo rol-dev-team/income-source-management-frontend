@@ -10,7 +10,8 @@ import {
 } from "./tokenService"; // Adjust path if tokenService is in a different directory
 
 const apiClient = axios.create({
-  baseURL: "http://172.17.118.26:8000/api", // Your Laravel API base URL
+  // baseURL: "http://172.17.118.26:8000/api", 
+  baseURL: "http://127.0.0.1:8000/api",
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
