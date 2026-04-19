@@ -1,9 +1,12 @@
+
+
+
 // import React, { useEffect, useState } from "react";
 // import { useFormik } from "formik";
 // import * as yup from "yup";
 // import { useNavigate, useLocation } from "react-router-dom";
 // import { showToast } from "../../helper/toastMessage";
-// import { fetchAllPaymentChannels,fetchAllPaymentChannelsByCurrency } from "../../service/paymentChannelDetailsApi";
+// import { fetchAllPaymentChannels, fetchAllPaymentChannelsByCurrency } from "../../service/paymentChannelDetailsApi";
 // import DatePickerInput from "../../components/common/DatePickerInput";
 // import {
 //   createCurrencyPosting,
@@ -76,6 +79,11 @@
 //   const [isAvailableBalance, setIsAvailableBalance] = useState(null);
 //   const [isDisabled, setIsDisabled] = useState(false);
 
+//   // New state for sell-specific channel summary
+//   const [channelSummaryMap, setChannelSummaryMap] = useState({}); // { payment_channel_id: net_amount }
+//   const [selectedChannelBalance, setSelectedChannelBalance] = useState(null);
+//   const [isCurrencyAmountInsufficient, setIsCurrencyAmountInsufficient] = useState(false);
+
 //   useEffect(() => {
 //     const loadInitialOptions = async () => {
 //       try {
@@ -136,6 +144,93 @@
 //       }
 //     },
 //   });
+
+//   // ─── When transaction_type = "sell" AND currency_id is selected,
+//   //     fetch payment channels filtered by currency ───────────────
+//   useEffect(() => {
+//     const isSell = formik.values.transaction_type === "sell";
+//     const currencyId = formik.values.currency_id;
+
+//     if (!isSell || !currencyId) {
+//       // Reset sell-specific state when not applicable
+//       setChannelSummaryMap({});
+//       setSelectedChannelBalance(null);
+//       setIsCurrencyAmountInsufficient(false);
+
+//       // When not sell, reload all channels
+//       if (!isSell) {
+//         fetchAllPaymentChannels()
+//           .then((res) => setPaymentChannelOptions(res.data || []))
+//           .catch(() => {});
+//       }
+//       return;
+//     }
+
+//     // Fetch currency-filtered channels
+//     fetchAllPaymentChannelsByCurrency({ params: { currency_id: currencyId } })
+//       .then((res) => {
+//         const data = res.data || [];
+//         // Build a map of payment_channel_id -> net_amount for quick lookup
+//         const map = {};
+//         data.forEach((item) => {
+//           map[item.payment_channel_id] = parseFloat(item.net_amount) || 0;
+//         });
+//         setChannelSummaryMap(map);
+
+//         // Set filtered payment channel options
+//         const filtered = data.map((item) => ({
+//           id: item.payment_channel_id,
+//           method_name: item.method_name,
+//         }));
+//         setPaymentChannelOptions(filtered);
+
+//         // Reset payment channel selection since options changed
+//         formik.setFieldValue("payment_channel_id", "");
+//         formik.setFieldValue("account_id", "");
+//         setSelectedChannelBalance(null);
+//       })
+//       .catch(() => {
+//         showToast.error("Failed to load payment channels for selected currency.");
+//       });
+//   }, [formik.values.transaction_type, formik.values.currency_id]);
+
+//   // ─── When payment_channel_id changes while sell is active,
+//   //     update the shown channel balance ──────────────────────────
+//   useEffect(() => {
+//     const isSell = formik.values.transaction_type === "sell";
+//     const channelId = formik.values.payment_channel_id;
+
+//     if (isSell && channelId && channelSummaryMap[channelId] !== undefined) {
+//       setSelectedChannelBalance(channelSummaryMap[channelId]);
+//     } else {
+//       setSelectedChannelBalance(null);
+//     }
+//     // Reset insufficiency when channel changes
+//     setIsCurrencyAmountInsufficient(false);
+//   }, [formik.values.payment_channel_id, channelSummaryMap, formik.values.transaction_type]);
+
+//   // ─── Validate currency_amount against selectedChannelBalance for Sell ──
+//   useEffect(() => {
+//     const isSell = formik.values.transaction_type === "sell";
+//     const currencyAmount = parseFloat(formik.values.currency_amount);
+
+//     if (
+//       isSell &&
+//       selectedChannelBalance !== null &&
+//       !isNaN(currencyAmount) &&
+//       currencyAmount > 0
+//     ) {
+//       if (currencyAmount > selectedChannelBalance) {
+//         setIsCurrencyAmountInsufficient(true);
+//         setIsDisabled(true);
+//       } else {
+//         setIsCurrencyAmountInsufficient(false);
+//         // Don't override isDisabled here; let the BDT balance check handle it
+//       }
+//     } else {
+//       setIsCurrencyAmountInsufficient(false);
+//     }
+//   }, [formik.values.currency_amount, selectedChannelBalance, formik.values.transaction_type]);
 
 //   useEffect(() => {
 //     const loadAccountOptions = async () => {
@@ -201,12 +296,11 @@
 //   useEffect(() => {
 //     if (formik.values.payment_channel_id == 8) {
 //       formik.setFieldValue("account_id", 1);
-//     } else if(formik.values.payment_channel_id == 15){
+//     } else if (formik.values.payment_channel_id == 15) {
 //       formik.setFieldValue("account_id", 9);
-//     }else {
+//     } else {
 //       formik.setFieldValue("account_id", "");
 //     }
-
 //   }, [formik.values.payment_channel_id]);
 
 //   const showCurrencyFields =
@@ -243,17 +337,22 @@
 //         showToast.error("Insufficient balance! Please enter a smaller amount.");
 //         setIsDisabled(true);
 //       } else {
-//         setIsDisabled(false);
+//         // Only re-enable if currency amount is also fine
+//         if (!isCurrencyAmountInsufficient) {
+//           setIsDisabled(false);
+//         }
 //       }
 //     } else {
-//       setIsDisabled(false);
+//       if (!isCurrencyAmountInsufficient) {
+//         setIsDisabled(false);
+//       }
 //     }
 //   }, [
 //     formik.values.amount_bdt,
 //     isAvailableBalance,
 //     formik.values.transaction_type,
+//     isCurrencyAmountInsufficient,
 //   ]);
-
 
 //   return (
 //     <div className='container mx-auto p-4'>
@@ -326,9 +425,20 @@
 //                     value={formik.values.currency_amount}
 //                     onChange={formik.handleChange}
 //                     onBlur={formik.handleBlur}
-//                     className='mt-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition duration-150 ease-in-out'
+//                     className={`mt-1 bg-gray-50 border text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition duration-150 ease-in-out ${
+//                       isCurrencyAmountInsufficient
+//                         ? "border-red-500"
+//                         : "border-gray-300"
+//                     }`}
 //                   />
-//                   {formik.touched.currency_amount &&
+//                   {isCurrencyAmountInsufficient && (
+//                     <p className='mt-1 text-sm text-red-500'>
+//                       Insufficient balance! Available:{" "}
+//                       {selectedChannelBalance?.toFixed(2)}
+//                     </p>
+//                   )}
+//                   {!isCurrencyAmountInsufficient &&
+//                     formik.touched.currency_amount &&
 //                     formik.errors.currency_amount && (
 //                       <p className='mt-1 text-sm text-red-500'>
 //                         {formik.errors.currency_amount}
@@ -410,6 +520,7 @@
 //                 )}
 //             </div>
 
+//             {/* Payment Channel Dropdown */}
 //             <div className='relative'>
 //               <select
 //                 id='payment_channel_id'
@@ -427,6 +538,13 @@
 //                   </option>
 //                 ))}
 //               </select>
+//               {/* Show available balance badge when sell + channel selected */}
+//               {formik.values.transaction_type === "sell" &&
+//                 selectedChannelBalance !== null && (
+//                   <p className='mt-1 text-sm text-green-600 font-medium'>
+//                     Available Balance: {selectedChannelBalance.toFixed(2)}
+//                   </p>
+//                 )}
 //               {formik.touched.payment_channel_id &&
 //                 formik.errors.payment_channel_id && (
 //                   <p className='mt-1 text-sm text-red-500'>
@@ -442,7 +560,11 @@
 //                 value={formik.values.account_id}
 //                 onChange={formik.handleChange}
 //                 onBlur={formik.handleBlur}
-//                 disabled={formik.values.payment_channel_id == 8 || formik.values.payment_channel_id == 15 || isAccountNoDependentLoading}
+//                 disabled={
+//                   formik.values.payment_channel_id == 8 ||
+//                   formik.values.payment_channel_id == 15 ||
+//                   isAccountNoDependentLoading
+//                 }
 //                 className='mt-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'>
 //                 <option value='' disabled>
 //                   My A/C No.
@@ -481,26 +603,9 @@
 //                 )}
 //             </div>
 
-//             {/* <div className='relative'>
-//               <input
-//                 id='posting_date'
-//                 name='posting_date'
-//                 type='date'
-//                 value={formik.values.posting_date}
-//                 onChange={formik.handleChange}
-//                 onBlur={formik.handleBlur}
-//                 className='mt-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition duration-150 ease-in-out'
-//               />
-//               {formik.touched.posting_date && formik.errors.posting_date && (
-//                 <p className='mt-1 text-sm text-red-500'>
-//                   {formik.errors.posting_date}
-//                 </p>
-//               )}
-//             </div> */}
-
 //             <div className='relative'>
 //               <DatePickerInput
-//               key={formik.values.posting_date}
+//                 key={formik.values.posting_date}
 //                 onDateChange={(date) => {
 //                   if (!date) {
 //                     formik.setFieldValue("posting_date", "");
@@ -545,7 +650,7 @@
 //             <button
 //               disabled={isDisabled}
 //               type='submit'
-//               className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105'>
+//               className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100'>
 //               {postingToEdit ? "Update" : "Submit"}
 //             </button>
 //           </div>
@@ -556,9 +661,6 @@
 // };
 
 // export default CreatePostingPage;
-
-
-
 
 
 
@@ -888,8 +990,8 @@ const CreatePostingPage = () => {
     if (
       formik.values.amount_bdt &&
       isAvailableBalance !== null &&
-      (formik.values.transaction_type === "payment" ||
-        formik.values.transaction_type === "sell")
+      // ── CHANGED: removed "sell" from this check ──
+      formik.values.transaction_type === "payment"
     ) {
       const enteredAmount = parseFloat(formik.values.amount_bdt);
       const available = parseFloat(isAvailableBalance);
